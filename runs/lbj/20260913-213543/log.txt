@@ -1,0 +1,22 @@
+17:35:43 INFO    main: target lbj v0.2-draft (14 principles, 3 tradeoffs, 98 key passages); run dir /Users/devinli/llm_persona_data_pipeline/runs/lbj/20260913-213543
+17:35:43 INFO    main: === stage: generate ===
+17:37:59 INFO    pipeline.generate: families: 16 of 16 planned (16 new, 0 reserved by the avoided-topic screen)
+17:40:06 INFO    pipeline.generate: prompts: 30 total (30 new)
+17:46:49 INFO    pipeline.generate: responses: 30 total (30 new, 0 failed)
+17:46:49 INFO    main: === stage: baseline ===
+18:08:10 INFO    pipeline.baseline: baseline: 16 answers total (16 new, 0 failed, 5 truncated)
+18:08:10 WARNING pipeline.baseline: baseline: 5 answers were cut off and cannot be compared: ['pr_f7ddbd8db1', 'pr_78f9189bdf', 'pr_059f863c9d', 'pr_c1a8ad850c', 'pr_58390b574b']
+18:09:21 INFO    pipeline.baseline: strong generic: 16 answers total (16 new, 0 failed, 0 truncated)
+18:09:21 INFO    main: === stage: validate ===
+18:17:31 WARNING pipeline.model: reviewer (accounts/fireworks/models/deepseek-v4-pro-0813) produced only reasoning at max_tokens=16000; retrying once at 32000
+18:21:08 INFO    pipeline.review: revise: rewriting 9 responses the reviewer flagged
+18:30:49 WARNING pipeline.model: reviewer_second attempt 1/10 failed (ReadTimeout: ); retrying in 1.5s
+18:39:09 WARNING pipeline.model: reviewer_second attempt 1/10 failed (ReadTimeout: ); retrying in 1.9s
+18:55:00 WARNING pipeline.model: reviewer_second attempt 1/10 failed (ReadTimeout: ); retrying in 2.0s
+19:03:07 WARNING pipeline.model: reviewer_second attempt 1/10 failed (ReadTimeout: ); retrying in 1.6s
+19:12:13 INFO    pipeline.validate: similarity (embeddings): 435 pairs, median 0.483, robust sd 0.092, threshold median+3.0sd = 0.758
+19:12:14 INFO    pipeline.validate: validate: {'responses': 30, 'kept': 27, 'dropped': 3, 'similarity_method': 'embeddings', 'similarity_calibration': {'statistic': 'median + 3 x robust_sd', 'centre': 0.4831, 'spread': 0.0916, 'sigmas': 3.0}, 'leakage_calibration': {'statistic': 'median + 3 x robust_sd', 'centre': 0.4997, 'spread': 0.0812, 'sigmas': 3.0}, 'duplicate_threshold': 0.7579, 'leakage_threshold': 0.7434, 'duplicate_clusters': 0, 'duplicates': 0, 'cue_hits': 0, 'eval_items_checked_for_leakage': 6, 'max_leakage_seen': 0.6947, 'divergence_confirmed': 9, 'divergence_not_confirmed': 1, 'divergence_unverified': 4, 'divergence_action': 8, 'divergence_reasons': 8, 'divergence_pairwise': {'candidate_vs_base': 11, 'candidate_vs_strong_generic': 10, 'strong_generic_vs_base': 10, 'judged': 11}, 'divergence_families_intended': 7, 'divergence_families_judged': 6, 'divergence_families_value': 5, 'divergence_value_rate_by_family': 0.714, 'divergence_families_value_any_prompt': 5, 'divergence_value_rate_any_prompt': 0.714, 'divergence_closer_to': {'generic': 7, 'neither': 4}, 'divergence_by_source': {'value': 9, 'capability': 1}, 'soft_cue_flags': 3, 'explicit_mode_records': 0, 'quoted_source_flags': 0, 'archaic_register_flags': 0, 'reviewer_flag_score_conflicts': {'reviews_with_flag_and_five': 3, 'reviews_total': 30, 'flag_five_pairs': {'formulaic_shape+scenario_quality=5': 2, 'confident_on_unresolved+judgment_not_terminology=5': 1, 'confident_on_unresolved+scenario_quality=5': 1, 'formulaic_shape+fidelity=5': 1}, 'stipulating_prompts': 2}}
+19:12:14 INFO    main: === stage: export ===
+19:12:14 INFO    pipeline.export: export: 22 training rows, 5 eval rows -> /Users/devinli/llm_persona_data_pipeline/runs/lbj/20260913-213543
+19:12:14 INFO    main: === stage: report ===
+19:12:14 INFO    pipeline.report: report: wrote /Users/devinli/llm_persona_data_pipeline/runs/lbj/20260913-213543/report.md

@@ -1,15 +1,20 @@
-# Full Part 1 run: about 500 SFT rows and 50 evaluation prompts.
+# Persona pilot: the drafter and persona targets, with kimi-k3 as the generator at maximum
+# reasoning effort. A standalone copy of pilot.yaml — the loader has no inheritance — so that
+# the four reviewed value-system targets keep the settings their cost and quality numbers were
+# measured on. Change generator settings here, not in pilot.yaml.
 #
-# COST: measured unit costs on the defaults below are $0.055 per generated response
-# and $0.018 per review, so this file as written (600 responses, one revise round)
-# projects to roughly $89, and about $49 with revise_rounds: 0. That is well above
-# the $10-20 in the implementation brief. Read the cost note in README.md and decide
-# on the levers (reasoning_effort, a cheaper generator or reviewer, fewer revise
-# rounds) before launching it.
+#   python persona_generalizer/draft_persona.py --subject "..." --id x --config configs/persona_pilot.yaml
+#   python main.py all --target <id> --targets-dir persona_generalizer/personas \
+#       --config configs/persona_pilot.yaml --n-families 2 --new-run --skip-baseline
 #
-# 200 families x 3 prompts = 600 candidates; roughly 15-20% is dropped by the
-# reviewer, duplicates and leakage, which lands near 500 kept training rows.
-# 40 eval families x 1 prompt + 10 reframed = 50 evaluation prompts.
+# COST WARNING. kimi-k3 is $3.00 in / $15.00 out per 1M tokens against qwen3p8-max's rates, and
+# `reasoning_effort: max` is the most expensive setting available — roughly 90% of completion
+# tokens in a run are reasoning, and reasoning is billed as output. That is affordable for a
+# drafter run (4 calls) and for a 2-family pilot; it is NOT the config to launch configs/full.yaml
+# sizes with. Measure on a small run first and read usage.jsonl before scaling.
+
+# Small pilot: a handful of families, enough to inspect every artifact by hand.
+# Sizes here are deliberately tiny; see full.yaml for the 500/50 run.
 
 # Travels into manifest.json next to the source licence terms.
 redistribution_note: ""
@@ -24,7 +29,7 @@ runs_dir: runs
 pricing_file: configs/pricing.yaml
 
 generation:
-  n_families: 240            # 200 train families + 40 eval families
+  n_families: 8              # override on the command line with --n-families
   families_per_call: 4       # families requested in one generator call
   # A batch occasionally comes back short. Unfilled slots are retried this many times.
   family_generation_attempts: 2
@@ -32,9 +37,9 @@ generation:
   # decision right), not one question at three lengths.
   prompts_per_family: 2
   eval_prompts_per_family: 1
-  divergence_fraction: 0.4   # at least 100 intended-divergence cases after filtering
-  eval_family_fraction: 0.167
-  reserved_family_fraction: 0.05   # held back entirely, for novel-transfer tests later
+  divergence_fraction: 0.5    # pilot: oversample intended-divergence so the divergence check has material
+  eval_family_fraction: 0.25
+  reserved_family_fraction: 0.0
   # Contrastive groups: the same situation with exactly one morally relevant fact
   # changed. Members are never deduped against each other and never split apart.
   # Tradeoffs whose families all go to eval, held out entirely so novel transfer is tested
@@ -67,7 +72,7 @@ generation:
   reframing_variants: [setting_shift, role_shift, fiction, roleplay, terse]
   # A reframing that still shares this much wording with its base tests nothing.
   reframing_max_jaccard: 0.55
-  reframing_families: 10     # eval families that also get a reframed prompt
+  reframing_families: 2      # eval families that also get a reframed prompt
   # Passage budgets. The family-generation call sees the whole passage file; response
   # generation only ever sees the passages its own family cites.
   # Share of responses that keep their deliberation. 1.0 is the normal setting; lower it
@@ -97,7 +102,7 @@ validation:
   revise_rounds: 1
   # Set to another model role (e.g. a second Fireworks model) to review everything twice
   # and record agreement. Leave empty for one reviewer.
-  second_reviewer_role: ""
+  second_reviewer_role: reviewer_second   # round-2 experiment E2: agreement with a second model family
   # The reviewer flags a response that quotes or closely echoes source wording. That is a
   # licensing control; set true to drop those rather than only report them.
   reject_on_quoted_source: false
@@ -111,21 +116,33 @@ evaluation:
 
 models:
   generator:
-    model: accounts/fireworks/models/qwen3p8-max
+    model: accounts/fireworks/models/kimi-k3
     base_url: https://api.fireworks.ai/inference/v1
     api_key_source: fireworks
     max_concurrency: 4
     temperature: 0.9
-    # Measured: this model spends about 5,000 tokens on reasoning for a response-
-    # generation prompt, and more on a contrastive-pair family batch: a batch has been
-    # observed to spend all of 16,000 on reasoning and return no answer. Reasoning is
-    # charged against max_tokens, so this ceiling is generous on purpose. The client
-    # raises a clear error naming the role when it is still too low.
-    max_tokens: 24000
-    # Cost lever, measured on a real generation call: extra_body: {reasoning_effort: low}
-    # cuts reasoning tokens about fourfold and the per-response cost about in half.
-    # Not every model accepts every value ("none" is rejected by gpt-oss-120b).
-    extra_body: {}
+    # NOT YET MEASURED on this model at this effort. The 5,000-token figure in pilot.yaml was
+    # taken on qwen3p8-max at default effort and does not carry over; kimi-k3 at max effort
+    # should be expected to spend considerably more. Read usage.jsonl after the first run and
+    # replace this comment with the real number.
+    max_tokens: 32000
+    # Maximum reasoning. docs/fireworks-notes.md records the accepted values as none / low /
+    # medium / high / max, probed live, and confirms kimi-k3 accepts reasoning_effort.
+    # Reasoning is charged against max_tokens above, so max effort needs the larger budget:
+    # a role whose budget is too small returns reasoning and no answer, and the client raises
+    # an error naming the role. If that happens here, drop to "high" rather than raising
+    # max_tokens further — 32000 is already the ceiling the client's own retry backs off to.
+    # Was `max`. Dropped to `high` after a live drafting run returned 88,000 characters of
+    # planning prose in the answer channel instead of the JSON object — the failure this file's
+    # own comment above predicts, and for which it prescribes exactly this remedy rather than a
+    # larger budget. The evidence pass is now batched by kind as well, so each call is smaller.
+    extra_body: {reasoning_effort: high}
+    # The 300s default cannot hold this role. A kimi-k3 call at max effort was measured at 242s
+    # server-side for a family batch in runs/lbj/, and the drafter's evidence pass is a much
+    # larger single generation — 70 structured passages in one response. Left at the default it
+    # times out, retries ten times at five minutes each, and produces nothing: two drafting runs
+    # died that way before this was found. Matches the precedent the local base role already set.
+    timeout_s: 1800
   reviewer:
     model: accounts/fireworks/models/deepseek-v4-pro-0813
     base_url: https://api.fireworks.ai/inference/v1
@@ -135,6 +152,27 @@ models:
     # Observed: this model spends 6,000-8,000 tokens reasoning about one review of a
     # real 60 KB spec, and reasoning is charged against max_tokens.
     max_tokens: 16000
+  reviewer_second:
+    # Round-2 experiment E2: a second reviewer from a third model family; writes
+    # reviews_second.jsonl and the report shows agreement. Not used for decisions.
+    #
+    # NOT kimi-k3, which is the generator in this config: a second reviewer that is the same
+    # model as the generator measures nothing, since the whole point of E2 is agreement ACROSS
+    # model families. glm-5p3 gives four distinct families in one run — Kimi generating,
+    # DeepSeek reviewing, GLM second-reviewing, DeepSeek judging — and is the strongest model
+    # on this account not already spoken for. It is also cheaper than kimi-k3
+    # ($1.40/$4.40 per 1M against $3.00/$15.00).
+    model: accounts/fireworks/models/glm-5p3
+    base_url: https://api.fireworks.ai/inference/v1
+    api_key_source: fireworks
+    max_concurrency: 4
+    temperature: 0.2
+    # GLM-5.3 is thinking-only: it rejects reasoning_effort "none" with a hard 400, and it
+    # always spends output tokens on reasoning, which is charged against this budget. The
+    # reviewer prompt also carries the whole target spec, about 11,000 input tokens on a real
+    # one. Hence 20000 rather than the 16000 the DeepSeek reviewer runs on. Do NOT add
+    # extra_body: {reasoning_effort: none} to this role.
+    max_tokens: 20000
   judge:
     model: accounts/fireworks/models/deepseek-v4-pro-0813
     base_url: https://api.fireworks.ai/inference/v1
@@ -150,8 +188,8 @@ models:
     supports_json_mode: false
   base:
     # Local llama-server, OpenAI-compatible. Start it before the baseline stage.
-    # Measured on this machine (8 CPU cores, no GPU): about 8 tokens/second, and
-    # llama-server serves one slot, so concurrency above 1 only queues.
+    # Measured on this machine (8 CPU cores, no GPU): 7.8 tok/s single stream,
+    # ~17 tok/s aggregate with 4 in flight (the server runs 4 slots). See docs/base-model.md.
     model: qwen2.5-7b-instruct
     base_url: http://127.0.0.1:8080/v1
     api_key_source: none
